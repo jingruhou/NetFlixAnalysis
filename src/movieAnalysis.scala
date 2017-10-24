@@ -1,5 +1,8 @@
+import au.com.bytecode.opencsv.CSVWriter
+import breeze.io.TextWriter.FileWriter
 import org.apache.spark.sql.SQLContext
 import org.apache.spark.{SparkConf, SparkContext}
+import com.databricks.spark.csv._
 
 /**
   * Created by hjr on 17-10-22.
@@ -13,7 +16,7 @@ object movieAnalysis {
     /**
       * 初始化环境配置
       */
-    val conf = new SparkConf().setAppName("movieAnalysis_xunfang.com").setMaster("local[4]")
+    val conf = new SparkConf().setAppName("movieAnalysis_xunfang.com").setMaster("local[8]")
     val sc = new SparkContext(conf)
 
     val sqlContext = new SQLContext(sc)
@@ -97,6 +100,28 @@ object movieAnalysis {
 
     println("文件数字编号为： "+fileNumbers)
 
+
+    def avgRatingAndCount(fileName:String): Unit ={
+
+      val movieID = sc.textFile(fileName)
+
+      val movieData = movieID.filter(x => !isHeader(x)).map(_.split(",")).map(p => training(p(0),p(1),p(2))).toDF()
+      movieData.registerTempTable("movieDataTable")
+
+      movieData.groupBy("CustomerID").count().show(10) //说明该数据中没有用户对一个电影评分两次以上
+      val customersCount = movieData.count()
+
+      val ratingsCount = movieData.agg("Rating" -> "sum").toDF().collect()
+      val avgMovie = movieData.agg("Rating" -> "avg").toDF().collect()
+
+      //val avgRating = avgMovie.zip(ratingsCount)
+      //avgRating.foreach(println)
+
+
+      val result = (fileNumbers, avgMovie(0), ratingsCount(0), customersCount)
+      //存储计算结果(平均评分 评分数)
+      println("计算结果： "+result)
+    }
     /**
       * 循环遍历所有训练数据文件[2001-17770]
       *
@@ -106,42 +131,14 @@ object movieAnalysis {
       if(fileNumbers <= 10000){
         //文件名小于等于10000的处理
         val fileNameNumber = "mv_"+"000"+fileNumbers+".txt"
-
         val fileName = "Resource/Data/training_set/training_set2000/training_set/"+fileNameNumber
-        val movieID = sc.textFile(fileName)
-
-        val movieData = movieID.filter(x => !isHeader(x)).map(_.split(",")).map(p => training(p(0),p(1),p(2))).toDF()
-        movieData.registerTempTable("movieDataTable")
-
-        movieData.groupBy("CustomerID").count().show(10) //说明该数据中没有用户对一个电影评分两次以上
-        val customersCount = movieData.count()
-
-        val ratingsCount = movieData.agg("Rating" -> "sum")
-        val avgMovie = movieData.agg("Rating" -> "avg")
-
-        val result = (fileNumbers, avgMovie.collect()(0), ratingsCount.collect()(0), customersCount)
-        //存储计算结果(平均评分 评分数)
-        println("计算结果： "+result)
+        avgRatingAndCount(fileName)
       }
       else {
         //文件名大于10000的处理
         val fileNameNumber = "mv_"+"00"+fileNumbers+".txt"
-
         val fileName = "Resource/Data/training_set/training_set2000/training_set/"+fileNameNumber
-        val movieID = sc.textFile(fileName)
-
-        val movieData = movieID.filter(x => !isHeader(x)).map(_.split(",")).map(p => training(p(0),p(1),p(2))).toDF()
-        movieData.registerTempTable("movieDataTable")
-
-        movieData.groupBy("CustomerID").count().show(100) //说明该数据中没有用户对一个电影评分两次以上
-        val customersCount = movieData.count()
-
-        val ratingsCount = movieData.agg("Rating" -> "sum")
-        val avgMovie = movieData.agg("Rating" -> "avg")
-
-        val result = (fileNumbers, avgMovie.collect()(0), ratingsCount.collect()(0), customersCount)
-        //存储计算结果(平均评分 评分数)
-        println("计算结果： "+result)
+        avgRatingAndCount(fileName)
       }
     }
     /**

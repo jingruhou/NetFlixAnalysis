@@ -9,5 +9,7 @@
     <orderEntry type="sourceFolder" forTests="false" />
     <orderEntry type="library" name="scala-sdk-2.10.5" level="application" />
     <orderEntry type="library" name="spark-assembly-1.6.3-hadoop2.6.0" level="project" />
+    <orderEntry type="library" name="spark-csv_2.10-1.2.0" level="project" />
+    <orderEntry type="library" name="commons-csv-1.5" level="project" />
   </component>
 </module>
