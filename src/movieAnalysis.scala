@@ -81,12 +81,69 @@ object movieAnalysis {
     movie2001Data.groupBy("CustomerID").count().show(100) //说明该数据中没有用户对一个电影评分两次以上
     val customersCount = movie2001Data.count()
 
-    //val ratingsCount = movie2001Data.agg("Rating" -> "sum")
+    val ratingsCount = movie2001Data.agg("Rating" -> "sum")
     val avgMovie2001 = movie2001Data.agg("Rating" -> "avg")
     avgMovie2001.show()
 
 
+    /**
+      * 文件名 字符串构造
+      */
+    val fileNames = "Resource/Data/training_set/training_set2000/training_set/mv_0002001.txt"
+    val namesString = fileNames.split("/").toList
+    val chrNumbers = namesString(5).split("\\.").toList//Note:(.)需要转义
+    val numbers = chrNumbers(0).split("_").toList
+    val fileNumbers = numbers(1)
 
+    println("文件数字编号为： "+fileNumbers)
+
+    /**
+      * 循环遍历所有训练数据文件[2001-17770]
+      *
+      * Note:组装文件名
+      */
+    for(fileNumbers <- 2001 to 17770){
+      if(fileNumbers <= 10000){
+        //文件名小于等于10000的处理
+        val fileNameNumber = "mv_"+"000"+fileNumbers+".txt"
+
+        val fileName = "Resource/Data/training_set/training_set2000/training_set/"+fileNameNumber
+        val movieID = sc.textFile(fileName)
+
+        val movieData = movieID.filter(x => !isHeader(x)).map(_.split(",")).map(p => training(p(0),p(1),p(2))).toDF()
+        movieData.registerTempTable("movieDataTable")
+
+        movieData.groupBy("CustomerID").count().show(10) //说明该数据中没有用户对一个电影评分两次以上
+        val customersCount = movieData.count()
+
+        val ratingsCount = movieData.agg("Rating" -> "sum")
+        val avgMovie = movieData.agg("Rating" -> "avg")
+
+        val result = (fileNumbers, avgMovie.collect()(0), ratingsCount.collect()(0), customersCount)
+        //存储计算结果(平均评分 评分数)
+        println("计算结果： "+result)
+      }
+      else {
+        //文件名大于10000的处理
+        val fileNameNumber = "mv_"+"00"+fileNumbers+".txt"
+
+        val fileName = "Resource/Data/training_set/training_set2000/training_set/"+fileNameNumber
+        val movieID = sc.textFile(fileName)
+
+        val movieData = movieID.filter(x => !isHeader(x)).map(_.split(",")).map(p => training(p(0),p(1),p(2))).toDF()
+        movieData.registerTempTable("movieDataTable")
+
+        movieData.groupBy("CustomerID").count().show(100) //说明该数据中没有用户对一个电影评分两次以上
+        val customersCount = movieData.count()
+
+        val ratingsCount = movieData.agg("Rating" -> "sum")
+        val avgMovie = movieData.agg("Rating" -> "avg")
+
+        val result = (fileNumbers, avgMovie.collect()(0), ratingsCount.collect()(0), customersCount)
+        //存储计算结果(平均评分 评分数)
+        println("计算结果： "+result)
+      }
+    }
     /**
       * 需求2： 得到平均评分前5的影片的所有评分
       *
