@@ -44,21 +44,12 @@ object movieAnalysis {
 
     trainingDataDF.registerTempTable("trainingDataTable")
 
-    val test1 = sqlContext.sql("select * from trainingDataTable limit 10")
-    //test1.foreach(println)
-
-
-
     val movieTitlesDataDF = sc.textFile("Resource/Data/movie_titles.txt")
       .map(_.split(","))
       .map(p => movieTitles(p(0),p(1),p(2)))
       .toDF()
 
     movieTitlesDataDF.registerTempTable("movieTitlesDataTable")
-
-    val test2 = sqlContext.sql("select * from movieTitlesDataTable limit 10")
-    //test2.foreach(println)
-
 
     /**
       * 需求1： 统计所有2000年以后上映影片的平均评分和评分数
@@ -88,28 +79,20 @@ object movieAnalysis {
     val avgMovie2001 = movie2001Data.agg("Rating" -> "avg")
     avgMovie2001.show()
 
+    /*******************************************************************************************************************/
 
-    /**
-      * 文件名 字符串构造
-      */
-    val fileNames = "Resource/Data/training_set/training_set2000/training_set/mv_0002001.txt"
-    val namesString = fileNames.split("/").toList
-    val chrNumbers = namesString(5).split("\\.").toList//Note:(.)需要转义
-    val numbers = chrNumbers(0).split("_").toList
-    val fileNumbers = numbers(1)
-
-    println("文件数字编号为： "+fileNumbers)
-
-    val writer1 = new PrintWriter(new File("Resource/avgRatingAndCount.csv"))
+    val writer1 = new PrintWriter(new File("Resource/avgRatingAndCount.txt"))
     /**
       * 求平均评分与评分数 方法定义
       * @param fileNumbers 训练数据文件数字编号
-      */
+      *
+      **/
+
     def avgRatingAndCount(fileNumbers:BigInt): Unit ={
 
       var fileNameNumber = ""
 
-      if(fileNumbers <= 10000)
+      if(fileNumbers < 10000)
         //文件名小于等于10000的处理
         fileNameNumber = "mv_"+"000"+fileNumbers+".txt"
       else
@@ -122,7 +105,7 @@ object movieAnalysis {
       val movieData = movieID.filter(x => !isHeader(x)).map(_.split(",")).map(p => training(p(0),p(1),p(2))).toDF()
       movieData.registerTempTable("movieDataTable")
 
-      movieData.groupBy("CustomerID").count().show(10) //说明该数据中没有用户对一个电影评分两次以上
+      //movieData.groupBy("CustomerID").count().show(10) //说明该数据中没有用户对一个电影评分两次以上
       val customersCount = movieData.count()
 
       val ratingsCount = movieData.agg("Rating" -> "sum").collect()
@@ -136,15 +119,21 @@ object movieAnalysis {
       //存储计算结果(平均评分 评分数)
       println("计算结果： "+result)
     }
+
     /**
+      *  *
       * 循环遍历所有训练数据文件[2001-17770]
       *
       * Note:组装文件名
       */
+
     for(fileNumbers <- 2001 to 17770){
       avgRatingAndCount(fileNumbers)
     }
     writer1.close()
+
+  /********************************************************************************************************************/
+
 
     /**
       * 需求2： 得到平均评分前5的影片的所有评分
@@ -164,20 +153,33 @@ object movieAnalysis {
       *
       */
 
-    val writer2 = new PrintWriter(new File("Resource/avgRatingAndCountSorted.csv"))
+    //val writer2 = new PrintWriter(new File("Resource/avgRatingAndCountSorted.txt"))
 
-    val avgRatingAndCountData = sc.textFile("Resource/avgRatingAndCount.csv")
+   /**
+     * 加载CSV文件
+     *  val avgRatingAndCountData = sc.textFile("Resource/avgRatingAndCount.csv")
+     *  val avgRatingAndCountData = sqlContext.read.format("com.databricks.spark.csv")
+     *  .option("header","false")
+     *  .option("inferSchema",true.toString)
+     *  .load("Resource/avgRatingAndCount.csv")
+     *
+     */
+   val avgRatingAndCountData = sc.textFile("Resource/avgRatingAndCount.txt")
+
+    avgRatingAndCountData.take(10).foreach(println)
+
+
+
     val line2Tuple4 = avgRatingAndCountData.map(line =>{
-      val lineData = line.split("\t")
-      (lineData(0),lineData(1),lineData(2),lineData(3))
+      val lineData = line.split("\n")
+      val lineTuple = lineData(0).split("\t")
+      (lineTuple(0),lineTuple(1),lineTuple(2),lineTuple(3))
     })
 
-    val result2 = line2Tuple4.map(x => ((x._1),x)).sortByKey().values
+    val result2 = line2Tuple4.map(x => ((x._2),x)).sortByKey().values
 
-    println(result2)
 
-    writer2.close()
-
+    result2.repartition(1).saveAsTextFile("Resource/avgRatingAndCountSorted")
 
     /**
       * 停止SC对象

@@ -1,6 +1,6 @@
 import java.io.{File, PrintWriter}
 
-import org.apache.spark.sql.SQLContext
+import org.apache.spark.sql.{Row, SQLContext}
 import org.apache.spark.{SparkConf, SparkContext}
 
 /**
@@ -42,8 +42,6 @@ object customerAnalysis {
       *
       */
 
-    val writer2 = new PrintWriter(new File("Resource/result2.csv"))
-
     val trainingDataDF = sc.textFile("Resource/Data/training_set/training_set/mv*.txt")
       .filter(x => !isHeader(x))
       .map(_.split(","))
@@ -51,18 +49,21 @@ object customerAnalysis {
 
     trainingDataDF.registerTempTable("trainingDataTable")
 
-    val result2 = trainingDataDF.groupBy("CustomerID").agg(("Rating","sum"),("Rating","avg"))
-    result2.show(100)
+    //val result2 = trainingDataDF.groupBy("CustomerID").agg(("Rating","sum"),("Rating","count"),("Rating","avg"))
 
-    println(result2)
+    val resultSum = trainingDataDF.groupBy("CustomerID").agg(("Rating","sum")).collect()
+    val resultCount = trainingDataDF.groupBy("CustomerID").agg(("Rating","count")).collect()
+    val resultAvg = trainingDataDF.groupBy("CustomerID").agg(("Rating","avg")).collect()
 
-    writer2.close()
+    val resultSumWithCount = resultSum.zip(resultCount)
+    val resultSumWithCountAndresultAvg = resultSumWithCount.zip(resultAvg)
+    //resultSumWithCountAndresultAvg.collect()
 
+    //resultSumWithCountAndresultAvg.saveAsTextFile("Resource/result2.csv")
 
     /**
       * 停止SC对象
       */
     sc.stop()
-
   }
 }
