@@ -1,8 +1,8 @@
-import au.com.bytecode.opencsv.CSVWriter
-import breeze.io.TextWriter.FileWriter
 import org.apache.spark.sql.SQLContext
 import org.apache.spark.{SparkConf, SparkContext}
-import com.databricks.spark.csv._
+
+import java.io.PrintWriter
+import java.io.File
 
 /**
   * Created by hjr on 17-10-22.
@@ -16,7 +16,7 @@ object movieAnalysis {
     /**
       * 初始化环境配置
       */
-    val conf = new SparkConf().setAppName("movieAnalysis_xunfang.com").setMaster("local[8]")
+    val conf = new SparkConf().setAppName("movieAnalysis_xunfang.com").setMaster("local[32]")
     val sc = new SparkContext(conf)
 
     val sqlContext = new SQLContext(sc)
@@ -100,10 +100,24 @@ object movieAnalysis {
 
     println("文件数字编号为： "+fileNumbers)
 
+    val writer1 = new PrintWriter(new File("Resource/avgRatingAndCount.csv"))
+    /**
+      * 求平均评分与评分数 方法定义
+      * @param fileNumbers 训练数据文件数字编号
+      */
+    def avgRatingAndCount(fileNumbers:BigInt): Unit ={
 
-    def avgRatingAndCount(fileName:String): Unit ={
+      var fileNameNumber = ""
 
-      val movieID = sc.textFile(fileName)
+      if(fileNumbers <= 10000)
+        //文件名小于等于10000的处理
+        fileNameNumber = "mv_"+"000"+fileNumbers+".txt"
+      else
+      //文件名大于10000的处理
+        fileNameNumber = "mv_"+"00"+fileNumbers+".txt"
+
+      val fileName = "Resource/Data/training_set/training_set2000/training_set/"+fileNameNumber
+      val movieID = sc.textFile(fileName).cache()
 
       val movieData = movieID.filter(x => !isHeader(x)).map(_.split(",")).map(p => training(p(0),p(1),p(2))).toDF()
       movieData.registerTempTable("movieDataTable")
@@ -111,14 +125,14 @@ object movieAnalysis {
       movieData.groupBy("CustomerID").count().show(10) //说明该数据中没有用户对一个电影评分两次以上
       val customersCount = movieData.count()
 
-      val ratingsCount = movieData.agg("Rating" -> "sum").toDF().collect()
-      val avgMovie = movieData.agg("Rating" -> "avg").toDF().collect()
+      val ratingsCount = movieData.agg("Rating" -> "sum").collect()
+      val avgMovie = movieData.agg("Rating" -> "avg").collect()
 
       //val avgRating = avgMovie.zip(ratingsCount)
       //avgRating.foreach(println)
 
-
-      val result = (fileNumbers, avgMovie(0), ratingsCount(0), customersCount)
+      val result = fileNumbers+"\t"+avgMovie(0)+"\t"+ratingsCount(0)+"\t"+customersCount
+      writer1.println(result)
       //存储计算结果(平均评分 评分数)
       println("计算结果： "+result)
     }
@@ -128,19 +142,10 @@ object movieAnalysis {
       * Note:组装文件名
       */
     for(fileNumbers <- 2001 to 17770){
-      if(fileNumbers <= 10000){
-        //文件名小于等于10000的处理
-        val fileNameNumber = "mv_"+"000"+fileNumbers+".txt"
-        val fileName = "Resource/Data/training_set/training_set2000/training_set/"+fileNameNumber
-        avgRatingAndCount(fileName)
-      }
-      else {
-        //文件名大于10000的处理
-        val fileNameNumber = "mv_"+"00"+fileNumbers+".txt"
-        val fileName = "Resource/Data/training_set/training_set2000/training_set/"+fileNameNumber
-        avgRatingAndCount(fileName)
-      }
+      avgRatingAndCount(fileNumbers)
     }
+    writer1.close()
+
     /**
       * 需求2： 得到平均评分前5的影片的所有评分
       *
@@ -149,9 +154,29 @@ object movieAnalysis {
 	    * c)聚合计算reduceByKey(),其中Key为CustomerID,结果为(CustomerID,Ratings[所有])
 	    * d)计算用户对电影的平均评分
       *
+      *
+      * 2001	[3.3146025501899077]	[97741.0]	29488
+      * 2002	[2.2596153846153846]	[470.0]	208
+      * 2003	[3.022222222222222]	[544.0]	180
+      * 2004	[2.842249657064472]	[2072.0]	729
+      * 2005	[2.7083333333333335]	[260.0]	96
+      * 2006	[2.432981316003249]	[2995.0]	1231
+      *
       */
 
+    val writer2 = new PrintWriter(new File("Resource/avgRatingAndCountSorted.csv"))
 
+    val avgRatingAndCountData = sc.textFile("Resource/avgRatingAndCount.csv")
+    val line2Tuple4 = avgRatingAndCountData.map(line =>{
+      val lineData = line.split("\t")
+      (lineData(0),lineData(1),lineData(2),lineData(3))
+    })
+
+    val result2 = line2Tuple4.map(x => ((x._1),x)).sortByKey().values
+
+    println(result2)
+
+    writer2.close()
 
 
     /**
